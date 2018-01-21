@@ -1,0 +1,15 @@
+# Object files
+*.o
+core
+
+# Executables
+*.elf
+*.lst
+*.app
+
+# Backup files
+*.*~
+
+# testing CLion
+.idea
+cmake-build-debug

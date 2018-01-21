@@ -1,0 +1,8 @@
+#!/bin/bash
+
+/usr/bin/arm-none-eabi-gdb -quiet << EOF
+target extended-remote :4242
+load motor.elf
+continue
+EOF
+
