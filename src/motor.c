@@ -17,7 +17,7 @@ static const uint8_t steps[] = {
 
 static int motor_pos = 0;
 
-void motor_setup()
+void motor_init()
 {
     gpio_set_pin_mode(&MOTOR0_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR1_PIN, GPIO_MODE_OUT_PUSH_PULL);

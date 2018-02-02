@@ -1,7 +1,7 @@
 #ifndef CATFEEDER_BUTTON_H
 #define CATFEEDER_BUTTON_H
 
-void setup_button();
-bool is_button_pressed();
+void button_init();
+bool button_is_pressed();
 
 #endif

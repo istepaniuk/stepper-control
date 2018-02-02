@@ -4,12 +4,12 @@
 #include "platform.h"
 #include "hardware.h"
 
-void setup_button()
+void button_init()
 {
     gpio_set_pin_mode(&BUTTON_PIN, GPIO_MODE_IN_FLOATING);
 }
 
-bool is_button_pressed()
+bool button_is_pressed()
 {
     return gpio_get_pin_state(&BUTTON_PIN);
 }

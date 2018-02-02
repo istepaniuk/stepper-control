@@ -19,6 +19,4 @@
 #define MOTOR3_PIN GPIO_PIN_B15
 
 
-void setup_gpio();
-
 #endif

@@ -10,6 +10,15 @@ static const uint16_t pins[] = {
     GPIO_Pin_12, GPIO_Pin_13, GPIO_Pin_14, GPIO_Pin_15
 };
 
+void gpio_init()
+{
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
+}
+
 static void setup_interrupt_controller(uint16_t pin_number)
 {
     int exti_channel;
@@ -61,7 +70,7 @@ void gpio_set_interrupt_on_rising(pin_def_t * pin, void *callback)
     GPIO_EXTILineConfig(port_source, pin_source);
     setup_interrupt_controller(pin->number);
 
-    set_exti_line_interrupt_callback(exti_line, callback);
+    interrupt_set_exti_line_callback(exti_line, callback);
 }
 
 void gpio_set_pin_mode(pin_def_t * pin, GPIOMode_TypeDef mode)

@@ -7,10 +7,10 @@
 
 int main(void)
 {
-    setup_gpio();
-    setup_button();
-    setup_leds();
-    motor_setup();
+    gpio_init();
+    button_init();
+    leds_init();
+    motor_init();
     usart_init();
 
     int x = 0;

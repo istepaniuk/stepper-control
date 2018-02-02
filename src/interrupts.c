@@ -13,7 +13,7 @@ static void (*exti_line11_interrupt_callback) () = default_handler;
 static void (*exti_line12_interrupt_callback) () = default_handler;
 static void (*timer2_interrupt_callback) () = default_handler;
 
-void set_exti_line_interrupt_callback(int line, void *callback)
+void interrupt_set_exti_line_callback(int line, void *callback)
 {
     switch (line) {
         case EXTI_Line0:
@@ -31,7 +31,7 @@ void set_exti_line_interrupt_callback(int line, void *callback)
     }
 }
 
-void set_timer2_interrupt_callback(void *callback)
+void interrupt_set_timer2_callback(void *callback)
 {
     timer2_interrupt_callback = callback;
 }

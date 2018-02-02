@@ -75,6 +75,8 @@ typedef struct pin_def_t {
     uint16_t number;
 } pin_def_t;
 
+
+void gpio_init();
 void gpio_set_pin_mode(pin_def_t * pin, GPIOMode_TypeDef mode);
 void gpio_set_interrupt_on_rising(pin_def_t * pin, void *callback);
 bool gpio_get_pin_state(pin_def_t * pin);

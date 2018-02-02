@@ -59,7 +59,6 @@ set(SOURCE_FILES
         src/platform.c
         src/delay.c
         src/leds.c
-        src/hardware.c
         src/button.c
         src/usart.c
         src/timer.c test/avr.c)
