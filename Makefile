@@ -1,4 +1,4 @@
-TARGET = motor
+TARGET = stepper-control
 
 TOOLCHAIN = /usr
 AS = $(TOOLCHAIN)/bin/arm-none-eabi-as

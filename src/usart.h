@@ -1,5 +1,5 @@
-#ifndef CATFEEDER_USART_H
-#define CATFEEDER_USART_H
+#ifndef STEPPER_CONTROL_USART_H
+#define STEPPER_CONTROL_USART_H
 #include <stm32f10x.h>
 
 void usart_putc(uint8_t ch);

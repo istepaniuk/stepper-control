@@ -1,5 +1,5 @@
-#ifndef CATFEEDER_MOTOR_H
-#define CATFEEDER_MOTOR_H
+#ifndef STEPPER_CONTROL_MOTOR_H
+#define STEPPER_CONTROL_MOTOR_H
 
 static void update_output();
 

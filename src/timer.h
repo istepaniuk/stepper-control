@@ -1,5 +1,5 @@
-#ifndef CATFEEDER_TIMER_H
-#define CATFEEDER_TIMER_H
+#ifndef STEPPER_CONTROL_TIMER_H
+#define STEPPER_CONTROL_TIMER_H
 
 
 void timer2_init(uint16_t period, uint16_t prescaler);

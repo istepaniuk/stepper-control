@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(motor C ASM)
+project(stepper-control C ASM)
 
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)

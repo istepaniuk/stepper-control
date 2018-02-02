@@ -1,5 +1,5 @@
-#ifndef CATFEEDER_HARDWARE_H
-#define CATFEEDER_HARDWARE_H
+#ifndef STEPPER_CONTROL_HARDWARE_H
+#define STEPPER_CONTROL_HARDWARE_H
 
 #include <stm32f10x.h>
 #include "platform.h"
