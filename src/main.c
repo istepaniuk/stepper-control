@@ -15,9 +15,9 @@ int main(void)
 
     int x = 0;
     while (1) {
-        x += 96*8;
-        motor_goto(x);
-        motor_goto(x - 96);
+//        x += 96*8;
+//        motor_goto(x);
+//        motor_goto(x - 96);
         delay_ms(1500);
     }
 }

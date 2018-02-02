@@ -1,6 +1,7 @@
 # Object files
 *.o
 core
+cmake-build-debug
 
 # Executables
 *.elf
@@ -10,6 +11,5 @@ core
 # Backup files
 *.*~
 
-# testing CLion
+# CLion stuff
 .idea
-cmake-build-debug

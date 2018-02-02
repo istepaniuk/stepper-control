@@ -3,6 +3,8 @@
 #include "motor.h"
 #include "hardware.h"
 #include "delay.h"
+#include "timer.h"
+#include "interrupts.h"
 
 static const uint8_t steps[] = {
         0b0001,
@@ -19,15 +21,29 @@ static int motor_pos = 0;
 
 void motor_init()
 {
+    motor_pos = 0;
+
     gpio_set_pin_mode(&MOTOR0_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR1_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR2_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR3_PIN, GPIO_MODE_OUT_PUSH_PULL);
 
-    gpio_set_pin_low(&MOTOR0_PIN);
-    gpio_set_pin_low(&MOTOR1_PIN);
-    gpio_set_pin_low(&MOTOR2_PIN);
-    gpio_set_pin_low(&MOTOR3_PIN);
+    motor_off();
+
+    //F = CLK/((PSC + 1)*(ARR + 1))
+    //24MHz CLK/(1000-1)*(24-1) = 1 KHz ISR
+    //24MHz CLK/(1000-1)*(2400-1) = 10 Hz ISR
+
+    timer2_init(1000-1, 2400-1);
+    timer2_start();
+
+    interrupt_set_timer2_callback(timer_interrupt_handler);
+}
+
+static void timer_interrupt_handler()
+{
+    motor_pos++;
+    update_output();
 }
 
 void motor_off(){
@@ -51,7 +67,7 @@ static int difference(int a, int b)
     return a > b ? a - b : b - a;
 }
 
- enum { STOP, ACCEL, RUN, DECEL } status = STOP;
+enum { STOP, ACCEL, RUN, DECEL } status = STOP;
 
 // Direction stepper motor should move.
 unsigned char dir;
@@ -67,7 +83,7 @@ signed int min_delay;
 signed int accel_count;
 
 
-void motor_int(int new_position)
+void motor_interrupt(int new_position)
 {
     switch (status){
         case STOP:
@@ -118,32 +134,36 @@ void motor_int(int new_position)
 
 static unsigned long sqrt(unsigned long x)
 {
-    register unsigned long result;  // result register
-    register unsigned long q2;  // scan-bit register
-    register unsigned char flag;   // flag (one bit)
+    register unsigned long result;
+    register unsigned long q2scan_bit;
+    register unsigned char flag;   
 
-    result = 0;                     // clear result
-    q2 = 0x40000000L;           // higest possible result bit
+    result = 0;                        
+    q2scan_bit = HIGHEST_SQRT_RESULT_BIT;
+
     do {
-        if ((result + q2) <= x) {
-            x -= result + q2;
-            flag = 1;                  // set flag
+        if ((result + q2scan_bit) <= x) {
+            x -= result + q2scan_bit;
+            flag = 1;
         }
         else {
-            flag = 0;                  // clear flag
+            flag = 0;
         }
+
         result >>= 1;
+
         if (flag) {
-            result += q2;               // test flag
+            result += q2scan_bit;
         }
+
     }
-    while (q2 >>= 2);                // shift twice
+    while (q2scan_bit >>= 2);
+
     if (result < x) {
-        return result + 1;             // add for rounding
+        return result + 1;
     }
-    else {
-        return result;
-    }
+
+    return result;
 }
 
 static unsigned int min(unsigned int x, unsigned int y)
