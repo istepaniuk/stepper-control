@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stm32f10x.h>
+#include <stdlib.h>
 #include "motor.h"
 #include "hardware.h"
 #include "delay.h"
@@ -17,11 +18,17 @@ static const uint8_t steps[] = {
         0b1001
 };
 
-static int motor_pos = 0;
+static enum { STOP, ACCEL, RUN, DECEL } status = STOP;
+static int current_position = 0;
+static int end_position = 0;
+static int start_position = 0;
+static uint16_t speed = 1000;
+void advance_position();
+
 
 void motor_init()
 {
-    motor_pos = 0;
+    current_position = 0;
 
     gpio_set_pin_mode(&MOTOR0_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR1_PIN, GPIO_MODE_OUT_PUSH_PULL);
@@ -32,21 +39,77 @@ void motor_init()
 
     //F = CLK/((PSC + 1)*(ARR + 1))
     //24MHz CLK/(1000-1)*(24-1) = 1 KHz ISR
-    //24MHz CLK/(1000-1)*(2400-1) = 10 Hz ISR
-
-    timer2_init(1000-1, 2400-1);
+    timer2_init((uint16_t) (10000 - speed - 1), 240 - 1);
     timer2_start();
 
     interrupt_set_timer2_callback(timer_interrupt_handler);
 }
 
-static void timer_interrupt_handler()
+int difference(int a, int b)
 {
-    motor_pos++;
-    update_output();
+    return a > b ? a - b : b - a;
 }
 
-void motor_off(){
+static void timer_interrupt_handler()
+{
+    int went = difference(current_position, start_position);
+    int to_go = difference(current_position, end_position);
+    int START_SLOPE_SIZE = 150;
+    int END_SLOPE_SIZE = 150;
+    
+    switch (status) {
+        case STOP:
+            break;
+        case ACCEL:
+            speed += 8;
+            advance_position();
+            if(went > START_SLOPE_SIZE){
+                status = RUN;
+            }
+            break;
+        case DECEL:
+            speed -= 8;
+            advance_position();
+            break;
+        case RUN:
+            advance_position();
+            if(to_go < END_SLOPE_SIZE){
+                status = DECEL;
+            }
+            break;
+    }
+
+    update_output();
+    timer2_set_period((uint16_t) (10000 - speed - 1));
+}
+
+void advance_position()
+{
+    if (current_position < end_position) {
+        current_position++;
+    }
+    else if (current_position > end_position) {
+        current_position--;
+    }
+    else {
+        status = STOP;
+    }
+}
+
+void motor_goto(int new_position)
+{
+    speed = 7000;
+    if (new_position == current_position) {
+        return;
+    }
+
+    start_position = current_position;
+    end_position = new_position;
+    status = ACCEL;
+}
+
+void motor_off()
+{
     gpio_set_pin_low(&MOTOR0_PIN);
     gpio_set_pin_low(&MOTOR1_PIN);
     gpio_set_pin_low(&MOTOR2_PIN);
@@ -55,90 +118,28 @@ void motor_off(){
 
 static void update_output()
 {
-    uint8_t output = steps[motor_pos % 8];
+    uint8_t output;
+
+    if (current_position >= 0) {
+        output = steps[current_position % 8];
+    }
+    else {
+        output = steps[-current_position % 8];
+    }
+
     gpio_set_pin_state(&MOTOR0_PIN, (bool) (output & 0b0001));
     gpio_set_pin_state(&MOTOR1_PIN, (bool) (output & 0b0010));
     gpio_set_pin_state(&MOTOR2_PIN, (bool) (output & 0b0100));
     gpio_set_pin_state(&MOTOR3_PIN, (bool) (output & 0b1000));
 }
 
-static int difference(int a, int b)
+static unsigned int sqrt(unsigned int x)
 {
-    return a > b ? a - b : b - a;
-}
+    register unsigned int result;
+    register unsigned int q2scan_bit;
+    register unsigned char flag;
 
-enum { STOP, ACCEL, RUN, DECEL } status = STOP;
-
-// Direction stepper motor should move.
-unsigned char dir;
-// Peroid of next timer delay. At start this value set the accelration rate.
-unsigned int step_delay;
-// What step_pos to start decelaration
-unsigned int decel_start;
-// Sets deceleration rate.
-signed int decel_val;
-// Minimum time delay (max speed)
-signed int min_delay;
-//! Counter used when accelerateing/decelerateing to calculate step_delay.
-signed int accel_count;
-
-
-void motor_interrupt(int new_position)
-{
-    switch (status){
-        case STOP:
-            break;
-        case ACCEL:
-            break;
-        case RUN:
-            break;
-        case DECEL:
-            break;
-    }
-
-    int speed = 200;
-    int LEAD = 200;
-    int TAIL = 200;
-    int MAX_SPEED = 1000;
-    int moved = 0;
-    int deceleration_start = difference(new_position, motor_pos) - TAIL;
-
-    while (difference(new_position, motor_pos) > 0) {
-        moved++;
-
-        if (moved < LEAD && moved < deceleration_start) {
-            speed += 3;
-        }
-        else if (moved > LEAD && moved < deceleration_start) {
-            //
-        }
-        else if (moved > deceleration_start) {
-            speed -= 3;
-        }
-
-        if (speed > MAX_SPEED) {
-            speed = MAX_SPEED;
-        }
-
-        if (motor_pos < new_position) {
-            motor_pos++;
-        }
-        else {
-            motor_pos--;
-        }
-
-        update_output();
-        delay_us(4000 + 30 * (MAX_SPEED - speed));
-    }
-}
-
-static unsigned long sqrt(unsigned long x)
-{
-    register unsigned long result;
-    register unsigned long q2scan_bit;
-    register unsigned char flag;   
-
-    result = 0;                        
+    result = 0;
     q2scan_bit = HIGHEST_SQRT_RESULT_BIT;
 
     do {
@@ -166,7 +167,7 @@ static unsigned long sqrt(unsigned long x)
     return result;
 }
 
-static unsigned int min(unsigned int x, unsigned int y)
+static int min(int x, int y)
 {
     if (x < y) {
         return x;

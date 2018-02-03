@@ -22,9 +22,8 @@ void timer2_init(uint16_t period, uint16_t prescaler)
     TIM_TimeBaseStructure.TIM_Prescaler = prescaler;
     TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);    
-    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+    TIM_ITConfig(TIM2, TIM_IT_Update , ENABLE);
 }
 
 void timer2_start(void)
@@ -41,4 +40,9 @@ void timer2_stop(void)
 uint16_t timer2_get_current_counter(void)
 {
     return TIM_GetCounter(TIM2);
+}
+
+void timer2_set_period(uint16_t period)
+{
+    return TIM_SetAutoreload(TIM2, period);
 }
