@@ -14,9 +14,9 @@ int main(void)
 
     while(true){
         leds_turn_on_green();
-        motor_goto();
+        motor_goto(1000, 1000, 10, 10);
         while(motor_is_running()) {};
         leds_turn_off_green();
-        delay_ms(150);
+        delay_ms(1500);
     };
 }

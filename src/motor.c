@@ -24,20 +24,21 @@ typedef struct {
     uint16_t step_period;
     uint16_t min_step_period;
     uint16_t period_rest;
-    int decel_start_position;
+    uint32_t decel_start_position;
     int16_t accel_count;
-    int step_count;
+    uint32_t step_count;
     int16_t decel_initial_accel_count;
     uint16_t last_period_during_accel;
 } speed_ramp_t;
 
 speed_ramp_t ramp;
 
-static int current_position = 0;
+static uint32_t current_position = 0;
 
 static void update_step_period(speed_ramp_t *ramp);
 static void timer_interrupt_handler();
 static void update_output();
+static uint32_t sqrt(uint32_t x);
 
 
 void motor_init()
@@ -52,16 +53,60 @@ void motor_init()
     motor_off();
 }
 
-void motor_goto()
+void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t deceleration)
 {
-    //TODO: calculate these values from new_position, speed, accel & decel.
     ramp.status = ACCEL;
-    ramp.min_step_period = 860;
-    ramp.step_period = 16000;
     ramp.period_rest = 0;
     ramp.accel_count = 0;
-    ramp.decel_initial_accel_count = -100;
-    ramp.decel_start_position = 800;
+
+    ramp.min_step_period = (uint16_t) (A_T_x100 / speed);
+
+    // Set acelration by calc the first (c0) step delay .
+    // step_delay = 1 / tt * sqrt(2 * alpha / acceleration)
+    // step_delay =
+    //      (tfreq * 0.676 / 100)
+    //      * 100
+    //      * sqrt((2*alpha*10000000000) / (accel*100) )
+    //      / 10000
+    ramp.step_period = (uint16_t) ((T1_FREQ_148 * sqrt(A_SQ / acceleration)) / 100);
+
+
+    // Find out after how many steps does the speed hit the max speed limit.
+    // max_s_lim = speed^2 / (2 * alpha * accel)
+    uint32_t max_s_lim;
+    max_s_lim = speed * speed / (uint32_t) (((uint32_t) A_x20000 * acceleration) / 100);
+    // If we hit max speed limit before 0,5 step it will round to 0.
+    // But in practice we need to move at least 1 step.
+    if (max_s_lim == 0) {
+        max_s_lim = 1;
+    }
+
+
+    // Find out after how many steps we must start deceleration.
+    // n1 = (n1+n2) decel / (accel + decel)
+    uint32_t accel_lim;
+    accel_lim = ((uint32_t) step * deceleration) / (acceleration + deceleration);
+    // We must accelrate at least 1 step before we can start deceleration.
+    if (accel_lim == 0) {
+        accel_lim = 1;
+    }
+
+
+    // Use the limit we hit first to calc decel.
+    if (accel_lim <= max_s_lim) {
+        ramp.decel_initial_accel_count = (int16_t) (accel_lim - step);
+    }
+    else {
+        ramp.decel_initial_accel_count = (int16_t) (-(max_s_lim * acceleration) / deceleration);
+    }
+    // We must decelerate at least 1 step to stop.
+    if (ramp.decel_initial_accel_count == 0) {
+        ramp.decel_initial_accel_count = -1;
+    }
+
+    // Find step to start decleration.
+    ramp.decel_start_position = step + ramp.decel_initial_accel_count;
+
     ramp.step_count = 0;
 
     //F = CLK/((PSC + 1)*(ARR + 1))
@@ -184,4 +229,38 @@ static void update_output()
     gpio_set_pin_state(&MOTOR1_PIN, (bool) (output & 0b0010));
     gpio_set_pin_state(&MOTOR2_PIN, (bool) (output & 0b0100));
     gpio_set_pin_state(&MOTOR3_PIN, (bool) (output & 0b1000));
+}
+
+static uint32_t sqrt(uint32_t x)
+{
+    uint32_t result;
+    uint32_t scan_bit;
+    bool flag;
+
+    result = 0;
+    scan_bit = 0x40000000L;           // higest possible result bit
+
+    do {
+        if ((result + scan_bit) <= x) {
+            x -= result + scan_bit;
+            flag = true;
+        }
+        else {
+            flag = false;
+        }
+
+        result >>= 1;
+
+        if (flag) {
+            result += scan_bit;
+        }
+    }
+    while (scan_bit >>= 2);
+
+    if (result < x) {
+        // add for rounding
+        return result + 1;
+    }
+
+    return result;
 }
