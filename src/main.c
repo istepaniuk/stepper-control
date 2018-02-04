@@ -2,7 +2,6 @@
 #include "leds.h"
 #include "delay.h"
 #include "button.h"
-#include "usart.h"
 #include "motor.h"
 
 int main(void)
@@ -10,11 +9,14 @@ int main(void)
     gpio_init();
     button_init();
     leds_init();
-    usart_init();
+    delay_init();
     motor_init();
 
     while(true){
+        leds_turn_on_green();
         motor_goto();
-        delay_ms(6000);
+        while(motor_is_running()) {};
+        leds_turn_off_green();
+        delay_ms(100);
     };
 }
