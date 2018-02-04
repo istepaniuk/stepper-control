@@ -79,6 +79,11 @@ void motor_off()
     gpio_set_pin_low(&MOTOR3_PIN);
 }
 
+bool motor_is_running()
+{
+    return ramp.status != STOP;
+}
+
 static void update_step_period(speed_ramp_t *ramp)
 {
     uint16_t new_step_period;
