@@ -17,6 +17,6 @@ int main(void)
         motor_goto();
         while(motor_is_running()) {};
         leds_turn_off_green();
-        delay_ms(100);
+        delay_ms(150);
     };
 }

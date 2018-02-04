@@ -56,12 +56,12 @@ void motor_goto()
 {
     //TODO: calculate these values from new_position, speed, accel & decel.
     ramp.status = ACCEL;
-    ramp.min_step_period = 800;
-    ramp.step_period = 20000;
+    ramp.min_step_period = 860;
+    ramp.step_period = 16000;
     ramp.period_rest = 0;
     ramp.accel_count = 0;
-    ramp.decel_initial_accel_count = -50;
-    ramp.decel_start_position = 200;
+    ramp.decel_initial_accel_count = -100;
+    ramp.decel_start_position = 800;
     ramp.step_count = 0;
 
     //F = CLK/((PSC + 1)*(ARR + 1))
