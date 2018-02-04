@@ -1,7 +1,9 @@
 #ifndef STEPPER_CONTROL_DELAY_H
 #define STEPPER_CONTROL_DELAY_H
 
-void delay_ms(unsigned long delay);
-void delay_us(unsigned long delay);
+#include <stdint.h>
+
+void delay_init();
+void delay_ms(uint32_t delay);
 
 #endif
