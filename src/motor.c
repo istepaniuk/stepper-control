@@ -35,6 +35,8 @@ typedef struct {
 speed_ramp_t ramp;
 
 static uint32_t current_position = 0;
+static uint32_t motor_ticks = 0;
+
 
 static void update_step_period(speed_ramp_t *ramp);
 static void timer_interrupt_handler();
@@ -51,21 +53,36 @@ void motor_init()
     gpio_set_pin_mode(&MOTOR2_PIN, GPIO_MODE_OUT_PUSH_PULL);
     gpio_set_pin_mode(&MOTOR3_PIN, GPIO_MODE_OUT_PUSH_PULL);
 
+    ramp.status = STOP;
+
+    //F = CLK/((PSC + 1)*(ARR + 1))
+    //24MHz CLK/(1000-1)*(24-1) = 1 KHz ISR
+    //24MHz CLK/(100-1)*(24-1) = 10 KHz ISR
+    //24MHz CLK/(10-1)*(24-1) = 100 KHz ISR
+    timer2_init(100 - 1, 24 - 1);
+    timer2_start();
+    interrupt_set_timer2_callback(timer_interrupt_handler);
+
     motor_off();
 }
 
 void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t deceleration)
 {
+    current_position = 0;
+    motor_ticks = 0;
+
     //speed   in 0.01 * rad/sec
     //acc/dec in 0.01 * rad/sec^2
 
     usart_puts("\n\n======== GOTO\n");
-    ramp.status = ACCEL;
     ramp.period_rest = 0;
     ramp.accel_count = 0;
 
     // Cruise speed
     ramp.min_step_period = (uint16_t) (A_T_x100 / speed);
+    usart_puts("cruise:  ");
+    printint(ramp.min_step_period); usart_puts("\n");
+
 
     // Set acelration by calc the first (c0) step delay .
     // step_delay = 1 / tt * sqrt(2 * alpha / acceleration)
@@ -75,6 +92,8 @@ void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t d
     //      * sqrt( (2 * alpha * 10000000000) / (accel * 100) )
     //      / 10000
     ramp.step_period = (uint16_t) ((T1_FREQ_148 * sqrt(ALPHA_SQR / acceleration)) / 100);
+    usart_puts("period:  ");
+    printint(ramp.step_period); usart_puts("\n");
 
 
     // Find out after how many steps does the speed hit the max speed limit.
@@ -109,17 +128,17 @@ void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t d
     if (ramp.decel_initial_accel_count == 0) {
         ramp.decel_initial_accel_count = -1;
     }
+    usart_puts("decini:  ");
+    printint(ramp.decel_initial_accel_count); usart_puts("\n");
 
     // Find step to start decleration.
     ramp.decel_start_position = step + ramp.decel_initial_accel_count;
+    usart_puts("decfro:  ");
+    printint(ramp.decel_start_position); usart_puts("\n");
+
 
     ramp.step_count = 0;
-
-    //F = CLK/((PSC + 1)*(ARR + 1))
-    //24MHz CLK/(1000-1)*(24-1) = 1 KHz ISR
-    timer2_init(ramp.step_period - (int16_t) 1, 240 - 1);
-    timer2_start();
-    interrupt_set_timer2_callback(timer_interrupt_handler);
+    ramp.status = ACCEL;
 }
 
 void motor_off()
@@ -158,19 +177,19 @@ static void update_step_period(speed_ramp_t *ramp)
     ramp->step_period = new_step_period;
 }
 
-static void timer_interrupt_handler()
+static void motor_thingy()
 {
     switch (ramp.status) {
         case STOP:
-            usart_puts("ST ");
+            usart_puts("S ");
             ramp.step_count = 0;
             ramp.period_rest = 0;
-            timer2_stop();
 
             break;
 
         case ACCEL:
-            usart_puts("AC ");
+            usart_puts("A ");
+            printint(ramp.step_period);usart_puts("\n");
 
             current_position++;
             ramp.step_count++;
@@ -188,12 +207,14 @@ static void timer_interrupt_handler()
                 ramp.step_period = ramp.min_step_period;
                 ramp.period_rest = 0;
                 ramp.status = RUN;
+
+                usart_puts("\nR ");
+                printint(ramp.step_period);
             }
 
             break;
 
         case RUN:
-            usart_puts("RU ");
             current_position++;
             ramp.step_count++;
             ramp.step_period = ramp.min_step_period;
@@ -207,7 +228,9 @@ static void timer_interrupt_handler()
             break;
 
         case DECEL:
-            usart_puts("DE ");
+            usart_puts("D ");
+            printint(ramp.step_period);usart_puts("\n");
+
             current_position++;
             ramp.step_count++;
             ramp.accel_count++;
@@ -222,12 +245,18 @@ static void timer_interrupt_handler()
     }
 
     update_output();
+}
 
-    printint(ramp.step_period);
-    usart_puts("\n");
+static void timer_interrupt_handler()
+{
+    if (ramp.status != STOP) {
+        motor_ticks++;
 
-    timer2_set_period(ramp.step_period - (int16_t) 1);
-
+        if (motor_ticks >= ramp.step_period){
+            motor_ticks = 0;
+            motor_thingy();
+        }
+    }
 }
 
 static void update_output()

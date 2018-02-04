@@ -3,8 +3,7 @@
 
 //Constants from the AVR App note
 #define SPR 96                                        // steps per rev
-#define T1_FREQ 500000                               // timer freq
-
+#define T1_FREQ 10000                                 // timer freq
 
 // ALPHA is the angle of a single step, in radians
 // 2 * pi / SPR

@@ -19,7 +19,7 @@ int main(void)
 
         //acc/dec in 0.01 * rad/sec^2
         //speed   in 0.01 * rad/sec
-        motor_goto(96, 500, 25, 25);
+        motor_goto(96 * 6, 500, 70, 70);
 
         while(motor_is_running()) {};
 
