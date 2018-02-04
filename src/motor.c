@@ -1,15 +1,10 @@
 #include <stdbool.h>
 #include <stm32f10x.h>
-#include <stdlib.h>
 #include "motor.h"
 #include "hardware.h"
 #include "delay.h"
 #include "timer.h"
 #include "interrupts.h"
-
-static void update_step_period();
-static void timer_interrupt_handler();
-static void update_output();
 
 static const uint8_t STEP_OUTPUTS[] = {
         0b0001,
@@ -39,6 +34,10 @@ typedef struct {
 speed_ramp_t ramp;
 
 static int current_position = 0;
+
+static void update_step_period(speed_ramp_t *ramp);
+static void timer_interrupt_handler();
+static void update_output();
 
 
 void motor_init()
@@ -80,7 +79,7 @@ void motor_off()
     gpio_set_pin_low(&MOTOR3_PIN);
 }
 
-static void update_step_period()
+static void update_step_period(speed_ramp_t *ramp)
 {
     uint16_t new_step_period;
 
@@ -92,15 +91,15 @@ static void update_step_period()
      * AVR app note "AVR446: Linear speed control of stepper motor"
      * with some code examples that are... "different from great".*/
 
-    new_step_period = (uint16_t) (ramp.step_period -
-            (((2 * ramp.step_period) + ramp.period_rest)
-                    / (4 * ramp.accel_count + 1)));
+    new_step_period = (uint16_t) (ramp->step_period -
+            (((2 * ramp->step_period) + ramp->period_rest)
+                    / (4 * ramp->accel_count + 1)));
 
-    ramp.period_rest =
-            (uint16_t) (((2 * ramp.step_period) + ramp.period_rest)
-                    % (4 * ramp.accel_count + 1));
+    ramp->period_rest =
+            (uint16_t) (((2 * ramp->step_period) + ramp->period_rest)
+                    % (4 * ramp->accel_count + 1));
 
-    ramp.step_period = new_step_period;
+    ramp->step_period = new_step_period;
 }
 
 static void timer_interrupt_handler()
@@ -118,7 +117,7 @@ static void timer_interrupt_handler()
             ramp.step_count++;
             ramp.accel_count++;
 
-            update_step_period();
+            update_step_period(&ramp);
 
             if (ramp.step_count >= ramp.decel_start_position) {
                 ramp.accel_count = ramp.decel_initial_accel_count;
@@ -152,7 +151,7 @@ static void timer_interrupt_handler()
             ramp.step_count++;
             ramp.accel_count++;
 
-            update_step_period();
+            update_step_period(&ramp);
 
             if (ramp.accel_count >= 0) {
                 ramp.status = STOP;
