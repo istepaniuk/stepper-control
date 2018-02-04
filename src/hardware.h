@@ -5,8 +5,8 @@
 #include "platform.h"
 
 
-#define BLUE_LED_PIN GPIO_PIN_C13
-#define GREEN_LED_PIN GPIO_PIN_C9
+#define BLUE_LED_PIN GPIO_PIN_C15
+#define GREEN_LED_PIN GPIO_PIN_C13
 
 #define USART_TX_PIN GPIO_PIN_A9
 #define USART_RX_PIN GPIO_PIN_A10

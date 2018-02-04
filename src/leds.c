@@ -12,24 +12,24 @@ void leds_init()
     gpio_set_pin_low(&GREEN_LED_PIN);
 }
 
-void leds_turn_off_green()
+void leds_turn_on_green()
 {
     gpio_set_pin_low(&GREEN_LED_PIN);
 }
 
-void leds_turn_on_green()
+void leds_turn_off_green()
 {
     gpio_set_pin_high(&GREEN_LED_PIN);
 }
 
-static int is_blue_led_on = false;
+static bool is_blue_led_on = false;
 
-void leds_toggle_blue()
+void leds_toggle_green()
 {
     is_blue_led_on = !is_blue_led_on;
     if (is_blue_led_on) {
-        gpio_set_pin_high(&BLUE_LED_PIN);
+        leds_turn_on_green();
     } else {
-        gpio_set_pin_low(&BLUE_LED_PIN);
+        leds_turn_off_green();
     }
 }
