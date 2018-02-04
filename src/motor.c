@@ -5,6 +5,7 @@
 #include "delay.h"
 #include "timer.h"
 #include "interrupts.h"
+#include "usart.h"
 
 static const uint8_t STEP_OUTPUTS[] = {
         0b0001,
@@ -55,10 +56,15 @@ void motor_init()
 
 void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t deceleration)
 {
+    //speed   in 0.01 * rad/sec
+    //acc/dec in 0.01 * rad/sec^2
+
+    usart_puts("\n\n======== GOTO\n");
     ramp.status = ACCEL;
     ramp.period_rest = 0;
     ramp.accel_count = 0;
 
+    // Cruise speed
     ramp.min_step_period = (uint16_t) (A_T_x100 / speed);
 
     // Set acelration by calc the first (c0) step delay .
@@ -66,15 +72,15 @@ void motor_goto(uint32_t step, uint16_t speed, uint32_t acceleration, uint32_t d
     // step_delay =
     //      (tfreq * 0.676 / 100)
     //      * 100
-    //      * sqrt((2*alpha*10000000000) / (accel*100) )
+    //      * sqrt( (2 * alpha * 10000000000) / (accel * 100) )
     //      / 10000
-    ramp.step_period = (uint16_t) ((T1_FREQ_148 * sqrt(A_SQ / acceleration)) / 100);
+    ramp.step_period = (uint16_t) ((T1_FREQ_148 * sqrt(ALPHA_SQR / acceleration)) / 100);
 
 
     // Find out after how many steps does the speed hit the max speed limit.
     // max_s_lim = speed^2 / (2 * alpha * accel)
     uint32_t max_s_lim;
-    max_s_lim = speed * speed / (uint32_t) (((uint32_t) A_x20000 * acceleration) / 100);
+    max_s_lim = speed * speed / (uint32_t) (((uint32_t) ALPHA_20K * acceleration) / 100);
     // If we hit max speed limit before 0,5 step it will round to 0.
     // But in practice we need to move at least 1 step.
     if (max_s_lim == 0) {
@@ -156,6 +162,7 @@ static void timer_interrupt_handler()
 {
     switch (ramp.status) {
         case STOP:
+            usart_puts("ST ");
             ramp.step_count = 0;
             ramp.period_rest = 0;
             timer2_stop();
@@ -163,6 +170,8 @@ static void timer_interrupt_handler()
             break;
 
         case ACCEL:
+            usart_puts("AC ");
+
             current_position++;
             ramp.step_count++;
             ramp.accel_count++;
@@ -184,6 +193,7 @@ static void timer_interrupt_handler()
             break;
 
         case RUN:
+            usart_puts("RU ");
             current_position++;
             ramp.step_count++;
             ramp.step_period = ramp.min_step_period;
@@ -197,6 +207,7 @@ static void timer_interrupt_handler()
             break;
 
         case DECEL:
+            usart_puts("DE ");
             current_position++;
             ramp.step_count++;
             ramp.accel_count++;
@@ -210,8 +221,13 @@ static void timer_interrupt_handler()
             break;
     }
 
-    timer2_set_period(ramp.step_period - (int16_t) 1);
     update_output();
+
+    printint(ramp.step_period);
+    usart_puts("\n");
+
+    timer2_set_period(ramp.step_period - (int16_t) 1);
+
 }
 
 static void update_output()

@@ -3,19 +3,26 @@
 #include "delay.h"
 #include "button.h"
 #include "motor.h"
+#include "usart.h"
 
 int main(void)
 {
     gpio_init();
     button_init();
+    usart_init();
     leds_init();
     delay_init();
     motor_init();
 
     while(true){
         leds_turn_on_green();
-        motor_goto(1000, 1000, 10, 10);
+
+        //acc/dec in 0.01 * rad/sec^2
+        //speed   in 0.01 * rad/sec
+        motor_goto(96, 500, 25, 25);
+
         while(motor_is_running()) {};
+
         leds_turn_off_green();
         delay_ms(1500);
     };
