@@ -13,11 +13,8 @@ int main(void)
     usart_init();
     motor_init();
 
-    int x = 0;
-
-    while (1) {
-        motor_goto(x);
-        x += 500;
-        delay_ms(10000);
-    }
+    while(true){
+        motor_goto();
+        delay_ms(6000);
+    };
 }

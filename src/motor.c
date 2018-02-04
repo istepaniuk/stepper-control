@@ -7,7 +7,11 @@
 #include "timer.h"
 #include "interrupts.h"
 
-static const uint8_t steps[] = {
+static void update_step_period();
+static void timer_interrupt_handler();
+static void update_output();
+
+static const uint8_t STEP_OUTPUTS[] = {
         0b0001,
         0b0011,
         0b0010,
@@ -18,12 +22,23 @@ static const uint8_t steps[] = {
         0b1001
 };
 
-static enum { STOP, ACCEL, RUN, DECEL } status = STOP;
+typedef enum { STOP, ACCEL, RUN, DECEL } status_t;
+
+typedef struct {
+    status_t status;
+    uint16_t step_period;
+    uint16_t min_step_period;
+    uint16_t period_rest;
+    int decel_start_position;
+    int16_t accel_count;
+    int step_count;
+    int16_t decel_initial_accel_count;
+    uint16_t last_period_during_accel;
+} speed_ramp_t;
+
+speed_ramp_t ramp;
+
 static int current_position = 0;
-static int end_position = 0;
-static int start_position = 0;
-static uint16_t speed = 1000;
-void advance_position();
 
 
 void motor_init()
@@ -36,76 +51,25 @@ void motor_init()
     gpio_set_pin_mode(&MOTOR3_PIN, GPIO_MODE_OUT_PUSH_PULL);
 
     motor_off();
+}
+
+void motor_goto()
+{
+    //TODO: calculate these values from new_position, speed, accel & decel.
+    ramp.status = ACCEL;
+    ramp.min_step_period = 800;
+    ramp.step_period = 20000;
+    ramp.period_rest = 0;
+    ramp.accel_count = 0;
+    ramp.decel_initial_accel_count = -50;
+    ramp.decel_start_position = 200;
+    ramp.step_count = 0;
 
     //F = CLK/((PSC + 1)*(ARR + 1))
     //24MHz CLK/(1000-1)*(24-1) = 1 KHz ISR
-    timer2_init((uint16_t) (10000 - speed - 1), 240 - 1);
+    timer2_init(ramp.step_period - (int16_t) 1, 240 - 1);
     timer2_start();
-
     interrupt_set_timer2_callback(timer_interrupt_handler);
-}
-
-int difference(int a, int b)
-{
-    return a > b ? a - b : b - a;
-}
-
-static void timer_interrupt_handler()
-{
-    int went = difference(current_position, start_position);
-    int to_go = difference(current_position, end_position);
-    int START_SLOPE_SIZE = 150;
-    int END_SLOPE_SIZE = 150;
-    
-    switch (status) {
-        case STOP:
-            break;
-        case ACCEL:
-            speed += 8;
-            advance_position();
-            if(went > START_SLOPE_SIZE){
-                status = RUN;
-            }
-            break;
-        case DECEL:
-            speed -= 8;
-            advance_position();
-            break;
-        case RUN:
-            advance_position();
-            if(to_go < END_SLOPE_SIZE){
-                status = DECEL;
-            }
-            break;
-    }
-
-    update_output();
-    timer2_set_period((uint16_t) (10000 - speed - 1));
-}
-
-void advance_position()
-{
-    if (current_position < end_position) {
-        current_position++;
-    }
-    else if (current_position > end_position) {
-        current_position--;
-    }
-    else {
-        status = STOP;
-    }
-}
-
-void motor_goto(int new_position)
-{
-    speed = 7000;
-    if (new_position == current_position) {
-        return;
-    }
-
-    start_position = current_position;
-    end_position = new_position;
-    status = ACCEL;
 }
 
 void motor_off()
@@ -116,63 +80,96 @@ void motor_off()
     gpio_set_pin_low(&MOTOR3_PIN);
 }
 
+static void update_step_period()
+{
+    uint16_t new_step_period;
+
+    new_step_period = (uint16_t) (ramp.step_period -
+            (((2 * ramp.step_period) + ramp.period_rest)
+                    / (4 * ramp.accel_count + 1)));
+
+    ramp.period_rest =
+            (uint16_t) (((2 * ramp.step_period) + ramp.period_rest)
+                    % (4 * ramp.accel_count + 1));
+
+    ramp.step_period = new_step_period;
+}
+
+static void timer_interrupt_handler()
+{
+    switch (ramp.status) {
+        case STOP:
+            ramp.step_count = 0;
+            ramp.period_rest = 0;
+            timer2_stop();
+
+            break;
+
+        case ACCEL:
+            current_position++;
+            ramp.step_count++;
+            ramp.accel_count++;
+
+            update_step_period();
+
+            if (ramp.step_count >= ramp.decel_start_position) {
+                ramp.accel_count = ramp.decel_initial_accel_count;
+                ramp.status = DECEL;
+            }
+
+            else if (ramp.step_period <= ramp.min_step_period) {
+                ramp.last_period_during_accel = ramp.step_period;
+                ramp.step_period = ramp.min_step_period;
+                ramp.period_rest = 0;
+                ramp.status = RUN;
+            }
+
+            break;
+
+        case RUN:
+            current_position++;
+            ramp.step_count++;
+            ramp.step_period = ramp.min_step_period;
+
+            if (ramp.step_count >= ramp.decel_start_position) {
+                ramp.accel_count = ramp.decel_initial_accel_count;
+                ramp.step_period = ramp.last_period_during_accel;
+                ramp.status = DECEL;
+            }
+
+            break;
+
+        case DECEL:
+            current_position++;
+            ramp.step_count++;
+            ramp.accel_count++;
+
+            update_step_period();
+
+            if (ramp.accel_count >= 0) {
+                ramp.status = STOP;
+            }
+
+            break;
+    }
+
+    timer2_set_period(ramp.step_period - (int16_t) 1);
+    update_output();
+}
+
 static void update_output()
 {
     uint8_t output;
 
     if (current_position >= 0) {
-        output = steps[current_position % 8];
+        output = STEP_OUTPUTS[current_position % 8];
     }
     else {
-        output = steps[-current_position % 8];
+        output = STEP_OUTPUTS[-current_position % 8];
     }
 
     gpio_set_pin_state(&MOTOR0_PIN, (bool) (output & 0b0001));
     gpio_set_pin_state(&MOTOR1_PIN, (bool) (output & 0b0010));
     gpio_set_pin_state(&MOTOR2_PIN, (bool) (output & 0b0100));
     gpio_set_pin_state(&MOTOR3_PIN, (bool) (output & 0b1000));
-}
-
-static unsigned int sqrt(unsigned int x)
-{
-    register unsigned int result;
-    register unsigned int q2scan_bit;
-    register unsigned char flag;
-
-    result = 0;
-    q2scan_bit = HIGHEST_SQRT_RESULT_BIT;
-
-    do {
-        if ((result + q2scan_bit) <= x) {
-            x -= result + q2scan_bit;
-            flag = 1;
-        }
-        else {
-            flag = 0;
-        }
-
-        result >>= 1;
-
-        if (flag) {
-            result += q2scan_bit;
-        }
-
-    }
-    while (q2scan_bit >>= 2);
-
-    if (result < x) {
-        return result + 1;
-    }
-
-    return result;
-}
-
-static int min(int x, int y)
-{
-    if (x < y) {
-        return x;
-    }
-    else {
-        return y;
-    }
 }
