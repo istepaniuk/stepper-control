@@ -84,6 +84,14 @@ static void update_step_period()
 {
     uint16_t new_step_period;
 
+    /* Calculations for the new step period are an approximation
+     * for constant acceleration using a Taylor series, described in
+     * "Generate stepper-motor speed profiles in real time"
+     * by David Austin, Embedded Systems Programming, January 2005
+     * https://www.embedded.com/4006438 and further explored in the
+     * AVR app note "AVR446: Linear speed control of stepper motor"
+     * with some code examples that are... "different from great".*/
+
     new_step_period = (uint16_t) (ramp.step_period -
             (((2 * ramp.step_period) + ramp.period_rest)
                     / (4 * ramp.accel_count + 1)));
