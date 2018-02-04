@@ -85,7 +85,7 @@ typedef struct {
 #define ALPHA (2*3.14159/SPR)                    // 2*pi/spr
 #define A_T_x100 ((long)(ALPHA*T1_FREQ*100))     // (ALPHA / T1_FREQ)*100
 #define T1_FREQ_148 ((int)((T1_FREQ*0.676)/100)) // divided by 100 and scaled by 0.676
-#define A_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
+#define ALPHA_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
 #define A_x20000 (int)(ALPHA*20000)              // ALPHA*20000
 
 // Speed ramp states
@@ -179,7 +179,7 @@ void speed_cntr_Move(signed int step, unsigned int accel, unsigned int decel, un
         // Set accelration by calc the first (c0) step delay .
         // step_delay = 1/tt * sqrt(2*alpha/accel)
         // step_delay = ( tfreq*0.676/100 )*100 * sqrt( (2*alpha*10000000000) / (accel*100) )/10000
-        srd.step_delay = (T1_FREQ_148 * sqrt(A_SQ / accel)) / 100;
+        srd.step_delay = (T1_FREQ_148 * sqrt(ALPHA_SQ / accel)) / 100;
 
         // Find out after how many steps does the speed hit the max speed limit.
         // max_s_lim = speed^2 / (2*alpha*accel)
